@@ -1,0 +1,75 @@
+[gd_scene load_steps=2 format=3 uid="uid://b1gameover01"]
+
+[ext_resource type="Script" path="res://scripts/game_over.gd" id="1_go001"]
+
+[node name="GameOver" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_go001")
+
+[node name="DimOverlay" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.0, 0.0, 0.0, 0.75)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(420, 360)
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="GameOverLabel" type="Label" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+text = "GAME OVER"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 52
+theme_override_colors/font_color = Color(1.0, 0.2, 0.2, 1)
+
+[node name="Separator" type="HSeparator" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+
+[node name="KillLabel" type="Label" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+text = "Enemies Defeated: 0"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+
+[node name="TimeLabel" type="Label" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+text = "Survived: 00:00"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+
+[node name="LevelLabel" type="Label" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+text = "Level Reached: 1"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+
+[node name="Spacer" type="Control" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 16)
+
+[node name="BtnRestart" type="Button" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 56)
+text = "PLAY AGAIN"
+theme_override_font_sizes/font_size = 24
+
+[node name="BtnMenu" type="Button" parent="CenterContainer/Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 56)
+text = "MAIN MENU"
+theme_override_font_sizes/font_size = 24

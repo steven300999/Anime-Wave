@@ -1,0 +1,75 @@
+[gd_scene load_steps=2 format=3 uid="uid://b1mainmenu01"]
+
+[ext_resource type="Script" path="res://scripts/main_menu.gd" id="1_mm001"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_mm001")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.03, 0.12, 1)
+
+[node name="Stars" type="Node2D" parent="."]
+script = null
+
+[node name="TitleContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="TitleContainer"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="TitleLabel" type="Label" parent="TitleContainer/VBox"]
+layout_mode = 2
+text = "ANIME WAVE"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 64
+theme_override_colors/font_color = Color(0.3, 0.7, 1.0, 1)
+
+[node name="SubtitleLabel" type="Label" parent="TitleContainer/VBox"]
+layout_mode = 2
+text = "Survive the curse — master your power"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.6, 0.8, 1.0, 1)
+
+[node name="Spacer" type="Control" parent="TitleContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
+
+[node name="BtnPlay" type="Button" parent="TitleContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(260, 60)
+text = "PLAY"
+theme_override_font_sizes/font_size = 28
+
+[node name="BtnQuit" type="Button" parent="TitleContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(260, 60)
+text = "QUIT"
+theme_override_font_sizes/font_size = 28
+
+[node name="VersionLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 4
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -28.0
+offset_right = 200.0
+offset_bottom = -4.0
+text = "v0.1 — Godot 4"
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.4, 0.4, 0.5, 1)

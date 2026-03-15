@@ -1,0 +1,27 @@
+[gd_scene load_steps=4 format=3 uid="uid://b1player001"]
+
+[ext_resource type="Script" path="res://scripts/player.gd" id="1_pl001"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pl01"]
+radius = 12.0
+height = 40.0
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pl02"]
+radius = 50.0
+height = 50.0
+
+[node name="Player" type="CharacterBody2D"]
+collision_layer = 1
+collision_mask = 2
+script = ExtResource("1_pl001")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -4)
+shape = SubResource("CapsuleShape2D_pl01")
+
+[node name="ExpPickupArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 8
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ExpPickupArea"]
+shape = SubResource("CapsuleShape2D_pl02")

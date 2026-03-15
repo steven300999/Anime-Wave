@@ -1,0 +1,30 @@
+[gd_scene load_steps=9 format=3 uid="uid://b1game001"]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_gm001"]
+[ext_resource type="Script" path="res://scripts/wave_manager.gd" id="2_gm002"]
+[ext_resource type="Script" path="res://scripts/background.gd" id="3_gm003"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="4_gm004"]
+[ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="5_gm005"]
+[ext_resource type="PackedScene" path="res://scenes/level_up_ui.tscn" id="6_gm006"]
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_gm001")
+
+[node name="Background" type="Node2D" parent="."]
+
+[node name="BackgroundTiles" type="Node2D" parent="Background"]
+script = ExtResource("3_gm003")
+
+[node name="WaveManager" type="Node2D" parent="."]
+script = ExtResource("2_gm002")
+
+[node name="Player" parent="." instance=ExtResource("4_gm004")]
+position = Vector2(0, 0)
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(1.2, 1.2)
+process_callback = 1
+
+[node name="UI" parent="." instance=ExtResource("5_gm005")]
+
+[node name="LevelUpUI" parent="." instance=ExtResource("6_gm006")]

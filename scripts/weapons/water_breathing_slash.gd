@@ -37,7 +37,7 @@ func _draw() -> void:
 	var points := PackedVector2Array()
 	for i in 16:
 		var t := float(i) / 15.0
-		var angle := lerp(-PI * 0.35, PI * 0.35, t)
+		var angle: float = lerp(-PI * 0.35, PI * 0.35, t)
 		var r := 22.0 + sin(t * PI) * 8.0
 		points.append(Vector2(cos(angle), sin(angle)) * r)
 	# Draw as a thick arc

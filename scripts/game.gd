@@ -64,7 +64,7 @@ func _on_player_leveled_up(level: int) -> void:
 func _on_player_died() -> void:
 	# Wait briefly then show game over (player is hidden but not freed)
 	await get_tree().create_timer(0.8).timeout
-	var game_over := load("res://scenes/game_over.tscn").instantiate()
+	var game_over: Node = load("res://scenes/game_over.tscn").instantiate()
 	game_over.setup(kill_count, hud.get_elapsed(), player.level)
 	get_tree().root.add_child(game_over)
 	queue_free()

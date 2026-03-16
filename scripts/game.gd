@@ -7,6 +7,11 @@ extends Node2D
 @onready var camera: Camera2D = $Camera2D
 
 var kill_count := 0
+
+## Current level of each weapon path (0 = not yet owned, 1–7 = unlocked tiers).
+var _path_levels: Dictionary = {"rasengan": 0, "water_breathing": 0, "cursed_energy": 0}
+## The weapon path whose Evolution is currently active ("" = none).
+var _evolution_active := ""
 ## Maps path_id -> current level (0 / absent = unowned, 1-5 = upgrades,
 ## 6 = Limit Break, 7 = Evolution).
 var path_levels: Dictionary = {}
@@ -74,6 +79,12 @@ func _setup_background() -> void:
 
 func _on_player_leveled_up(level: int) -> void:
 	hud.update_level(level)
+	var has_any_limit_break := false
+	for l: int in _path_levels.values():
+		if l >= 6:
+			has_any_limit_break = true
+			break
+	level_up_ui.show_choices(level, _path_levels, has_any_limit_break, not _evolution_active.is_empty())
 	level_up_ui.show_choices(level, path_levels, has_evolution)
 
 func _on_player_died() -> void:
@@ -90,6 +101,26 @@ func _on_wave_started(wave: int) -> void:
 func _on_all_enemies_killed() -> void:
 	pass  # Next wave starts automatically after cooldown
 
+func _on_ability_chosen(ability_id: String) -> void:
+	match ability_id:
+		"heal":
+			player.heal(30.0)
+		"speed_up":
+			player.speed_multiplier += 0.2
+		"damage_up":
+			player.damage_multiplier += 0.25
+			_apply_damage_buff()
+		_:
+			# Weapon path — increment tier and apply upgrades
+			var current_level: int = _path_levels.get(ability_id, 0)
+			var new_level := current_level + 1
+			_path_levels[ability_id] = new_level
+			if current_level == 0:
+				_give_weapon(ability_id)  # First pick: spawn the weapon node
+			else:
+				_upgrade_weapon(ability_id, new_level)
+			if new_level == 7:
+				_evolution_active = ability_id
 func _on_ability_chosen(path_id: String) -> void:
 	var current_level: int = path_levels.get(path_id, 0)
 	var new_level: int = current_level + 1
@@ -161,6 +192,18 @@ func _give_weapon(weapon_id: String) -> void:
 	weapon_node.set_script(load(_WEAPON_SCRIPTS[weapon_id]))
 	player.add_child(weapon_node)
 	_weapons_by_id[weapon_id] = weapon_node
+
+## Call the weapon's upgrade() method for the new path level.
+func _upgrade_weapon(weapon_id: String, level: int) -> void:
+	if _weapons_by_id.has(weapon_id):
+		var weapon: Node = _weapons_by_id[weapon_id]
+		if weapon.has_method("upgrade"):
+			weapon.upgrade(level)
+
+func _apply_damage_buff() -> void:
+	for w in _weapons_by_id.values():
+		if "damage" in w:
+			w.damage *= 1.25
 
 func increment_kill() -> void:
 	kill_count += 1

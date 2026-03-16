@@ -1,10 +1,14 @@
 ## Rasengan (Naruto) — a spinning chakra orb that orbits the player and
-## damages any enemy it touches. Periodically resets its orbit angle for
-## full coverage.
+## damages any enemy it touches. Each upgrade level expands the orbit and
+## increases damage.
+##   Level 1: radius 50, 25 dmg, orbit speed 3.0 rad/s
+##   Level 2: radius 62, 38 dmg, orbit speed 4.0 rad/s
+##   Level 3: radius 75, 55 dmg, orbit speed 5.0 rad/s
 extends WeaponBase
 
-const ORBIT_RADIUS := 50.0
-const ORBIT_SPEED := 3.0  # radians/sec
+var _orbit_radius := 50.0
+var _orbit_speed := 3.0  # radians/sec
+var ability_level := 1
 
 var _orbit_angle := 0.0
 var _hit_cooldowns: Dictionary = {}
@@ -16,9 +20,21 @@ func _ready() -> void:
 	cooldown = 999.0  # continuous — handled by overlap
 	damage = 25.0
 
+func upgrade(new_level: int) -> void:
+	ability_level = new_level
+	match ability_level:
+		2:
+			_orbit_radius = 62.0
+			_orbit_speed = 4.0
+			damage = 38.0
+		3:
+			_orbit_radius = 75.0
+			_orbit_speed = 5.0
+			damage = 55.0
+
 func _process(delta: float) -> void:
-	_orbit_angle += ORBIT_SPEED * delta
-	var offset := Vector2(cos(_orbit_angle), sin(_orbit_angle)) * ORBIT_RADIUS
+	_orbit_angle += _orbit_speed * delta
+	var offset := Vector2(cos(_orbit_angle), sin(_orbit_angle)) * _orbit_radius
 	global_position = _player.global_position + offset
 	# Tick down hit cooldowns
 	for key in _hit_cooldowns.keys():

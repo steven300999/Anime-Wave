@@ -7,7 +7,8 @@ extends Node2D
 @onready var camera: Camera2D = $Camera2D
 
 var kill_count := 0
-var _owned_abilities: Array[String] = []
+# Tracks the current level of each ability (0 = not yet acquired)
+var _ability_levels: Dictionary = {}
 var _weapons_by_id: Dictionary = {}
 
 const _WEAPON_SCRIPTS := {
@@ -15,6 +16,9 @@ const _WEAPON_SCRIPTS := {
 	"rasengan": "res://scripts/weapons/rasengan.gd",
 	"water_breathing": "res://scripts/weapons/water_breathing.gd",
 	"cursed_energy": "res://scripts/weapons/cursed_energy.gd",
+	"zoro": "res://scripts/weapons/zoro.gd",
+	"frieza": "res://scripts/weapons/frieza.gd",
+	"goku": "res://scripts/weapons/goku.gd",
 }
 
 func _ready() -> void:
@@ -59,7 +63,7 @@ func _setup_background() -> void:
 
 func _on_player_leveled_up(level: int) -> void:
 	hud.update_level(level)
-	level_up_ui.show_choices(level, _owned_abilities)
+	level_up_ui.show_choices(level, _ability_levels)
 
 func _on_player_died() -> void:
 	# Wait briefly then show game over (player is hidden but not freed)
@@ -76,6 +80,9 @@ func _on_all_enemies_killed() -> void:
 	pass  # Next wave starts automatically after cooldown
 
 func _on_ability_chosen(ability_id: String) -> void:
+	var new_level := _ability_levels.get(ability_id, 0) + 1
+	_ability_levels[ability_id] = new_level
+
 	if ability_id == "heal":
 		player.heal(30.0)
 	elif ability_id == "speed_up":
@@ -83,9 +90,14 @@ func _on_ability_chosen(ability_id: String) -> void:
 	elif ability_id == "damage_up":
 		player.damage_multiplier += 0.25
 		_apply_damage_buff()
-	else:
+	elif new_level == 1:
+		# First time acquiring this weapon — add the node
 		_give_weapon(ability_id)
-	_owned_abilities.append(ability_id)
+		# Apply any accumulated damage boost to the freshly added weapon
+		_sync_weapon_damage(_weapons_by_id.get(ability_id))
+	else:
+		# Upgrade an existing weapon to its new level
+		_upgrade_weapon(ability_id, new_level)
 
 func _give_weapon(weapon_id: String) -> void:
 	if _weapons_by_id.has(weapon_id):
@@ -97,10 +109,30 @@ func _give_weapon(weapon_id: String) -> void:
 	player.add_child(weapon_node)
 	_weapons_by_id[weapon_id] = weapon_node
 
+func _upgrade_weapon(weapon_id: String, new_level: int) -> void:
+	if not _weapons_by_id.has(weapon_id):
+		return
+	var weapon = _weapons_by_id[weapon_id]
+	if weapon.has_method("upgrade"):
+		weapon.upgrade(new_level)
+	# After upgrade resets the weapon's base damage, reapply accumulated boosts
+	_sync_weapon_damage(weapon)
+
 func _apply_damage_buff() -> void:
+	# Called each time damage_up is chosen: multiply all active weapons by 1.25
 	for w in _weapons_by_id.values():
 		if "damage" in w:
 			w.damage *= 1.25
+
+func _sync_weapon_damage(weapon) -> void:
+	# Apply the full accumulated damage multiplier to a weapon's current base damage.
+	# This is safe to call repeatedly because callers always reset the weapon's base
+	# damage first (via _give_weapon or weapon.upgrade), so there is no compounding.
+	if weapon == null:
+		return
+	var boost_count: int = _ability_levels.get("damage_up", 0)
+	if "damage" in weapon and boost_count > 0:
+		weapon.damage *= pow(1.25, boost_count)
 
 func increment_kill() -> void:
 	kill_count += 1

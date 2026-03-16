@@ -12,6 +12,12 @@ var kill_count := 0
 var _path_levels: Dictionary = {"rasengan": 0, "water_breathing": 0, "cursed_energy": 0}
 ## The weapon path whose Evolution is currently active ("" = none).
 var _evolution_active := ""
+## Maps path_id -> current level (0 / absent = unowned, 1-5 = upgrades,
+## 6 = Limit Break, 7 = Evolution).
+var path_levels: Dictionary = {}
+## True once the player has unlocked any Evolution (level 7) upgrade.
+var has_evolution: bool = false
+
 var _weapons_by_id: Dictionary = {}
 
 const _WEAPON_SCRIPTS := {
@@ -20,6 +26,16 @@ const _WEAPON_SCRIPTS := {
 	"water_breathing": "res://scripts/weapons/water_breathing.gd",
 	"cursed_energy": "res://scripts/weapons/cursed_energy.gd",
 }
+
+## Maps path_id to the weapon it controls.
+const _PATH_WEAPON := {
+	"naruto": "rasengan",
+	"tanjiro": "water_breathing",
+	"itadori": "cursed_energy",
+}
+
+## Standard per-level damage multiplier applied at most path upgrade tiers.
+const _DAMAGE_BOOST := 1.3
 
 func _ready() -> void:
 	# Connect player signals
@@ -69,6 +85,7 @@ func _on_player_leveled_up(level: int) -> void:
 			has_any_limit_break = true
 			break
 	level_up_ui.show_choices(level, _path_levels, has_any_limit_break, not _evolution_active.is_empty())
+	level_up_ui.show_choices(level, path_levels, has_evolution)
 
 func _on_player_died() -> void:
 	# Wait briefly then show game over (player is hidden but not freed)
@@ -104,6 +121,67 @@ func _on_ability_chosen(ability_id: String) -> void:
 				_upgrade_weapon(ability_id, new_level)
 			if new_level == 7:
 				_evolution_active = ability_id
+func _on_ability_chosen(path_id: String) -> void:
+	var current_level: int = path_levels.get(path_id, 0)
+	var new_level: int = current_level + 1
+	path_levels[path_id] = new_level
+	if new_level == 7:
+		has_evolution = true
+	_apply_path_upgrade(path_id, new_level)
+
+## Apply gameplay stat changes for a path reaching the given level.
+func _apply_path_upgrade(path_id: String, level: int) -> void:
+	var weapon_id: String = _PATH_WEAPON.get(path_id, "")
+	if weapon_id.is_empty():
+		return
+
+	# Level 1: spawn the weapon for the first time
+	if level == 1:
+		_give_weapon(weapon_id)
+		return
+
+	var weapon_node = _weapons_by_id.get(weapon_id, null)
+	if not is_instance_valid(weapon_node):
+		return
+
+	match path_id:
+		"naruto":
+			match level:
+				2, 4, 5:
+					weapon_node.damage *= _DAMAGE_BOOST
+				3:  # Twin Rasengan — bigger jump
+					weapon_node.damage *= 1.5
+				6:  # Limit Break: Ultra Rasengan
+					weapon_node.damage *= 3.0
+				7:  # Evolution: Nine-Tails Mode
+					weapon_node.damage *= 2.0
+					player.speed_multiplier += 1.0
+		"tanjiro":
+			match level:
+				2:
+					weapon_node.damage *= _DAMAGE_BOOST
+				3:  # Flowing Dance — faster slashes
+					weapon_node.damage *= _DAMAGE_BOOST
+					weapon_node.cooldown = max(weapon_node.cooldown * 0.65, 0.4)
+				4, 5:
+					weapon_node.damage *= _DAMAGE_BOOST
+				6:  # Limit Break: Hinokami Kagura
+					weapon_node.damage *= 3.0
+				7:  # Evolution: Demon Slayer Mark
+					weapon_node.damage *= 2.0
+					weapon_node.cooldown = max(weapon_node.cooldown * 0.5, 0.3)
+		"itadori":
+			match level:
+				2, 3, 4:
+					weapon_node.damage *= _DAMAGE_BOOST
+				5:  # 1000 Strikes — faster fire rate
+					weapon_node.damage *= _DAMAGE_BOOST
+					weapon_node.cooldown = max(weapon_node.cooldown * 0.6, 0.4)
+				6:  # Limit Break: Black Flash
+					weapon_node.damage *= 3.0
+				7:  # Evolution: Sukuna's Domain
+					weapon_node.damage *= 2.0
+					weapon_node.cooldown = max(weapon_node.cooldown * 0.5, 0.3)
 
 func _give_weapon(weapon_id: String) -> void:
 	if _weapons_by_id.has(weapon_id):

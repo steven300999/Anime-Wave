@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3 uid="uid://b1zoroslash01"]
+
+[ext_resource type="Script" path="res://scripts/weapons/zoro_slash.gd" id="1_zs001"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_zs01"]
+size = Vector2(40, 10)
+
+[node name="ZoroSlash" type="Area2D"]
+script = ExtResource("1_zs001")
+collision_layer = 4
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_zs01")

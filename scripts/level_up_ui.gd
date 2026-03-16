@@ -2,7 +2,13 @@ extends CanvasLayer
 
 signal ability_chosen(ability_id: String)
 
-const ONCE_ONLY := ["rasengan", "water_breathing", "cursed_energy"]
+const ONCE_ONLY := ["rasengan", "water_breathing", "cursed_energy", "limit_break", "evolution"]
+
+## Minimum player level required before this ability can appear in the pool.
+const ABILITY_MIN_LEVEL := {
+	"limit_break": 6,
+	"evolution": 8,
+}
 
 const ABILITIES := {
 	"rasengan": {
@@ -35,6 +41,16 @@ const ABILITIES := {
 		"desc": "All weapons deal 25% more damage.",
 		"color": Color(1.0, 0.3, 0.1)
 	},
+	"limit_break": {
+		"name": "⚡ LIMIT BREAK",
+		"desc": "Break your limits! All weapons deal\ndouble damage and fire faster.",
+		"color": Color(1.0, 0.6, 0.0)
+	},
+	"evolution": {
+		"name": "✦ EVOLUTION",
+		"desc": "Transcend your form! Maximum power —\ndamage ×3, speed ×1.5, full heal.",
+		"color": Color(1.0, 0.9, 0.1)
+	},
 }
 
 @onready var card_container: HBoxContainer = $Overlay/Panel/VBox/Cards
@@ -50,17 +66,22 @@ func _ready() -> void:
 func show_choices(level: int, already_owned: Array) -> void:
 	level_up_label.text = "Level Up! — Lv. %d\nChoose an Ability" % level
 	_clear_cards()
-	_offered_ids = _pick_abilities(3, already_owned)
+	_offered_ids = _pick_abilities(3, already_owned, level)
 	for id in _offered_ids:
 		_create_card(id)
 	visible = true
 	get_tree().paused = true
 
-func _pick_abilities(count: int, owned: Array) -> Array[String]:
+func _pick_abilities(count: int, owned: Array, level: int) -> Array[String]:
 	var pool := ABILITIES.keys().duplicate()
-	# Exclude weapons the player already has
+	# Exclude weapons/specials the player already has
 	pool = pool.filter(func(id: String) -> bool:
-		return not (id in ONCE_ONLY and id in owned))
+		if id in ONCE_ONLY and id in owned:
+			return false
+		# Exclude special abilities not yet reachable at this level
+		if ABILITY_MIN_LEVEL.has(id) and level < ABILITY_MIN_LEVEL[id]:
+			return false
+		return true)
 	pool.shuffle()
 	var result: Array[String] = []
 	for id in pool:

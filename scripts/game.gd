@@ -82,7 +82,11 @@ func _on_ability_chosen(ability_id: String) -> void:
 		player.speed_multiplier += 0.2
 	elif ability_id == "damage_up":
 		player.damage_multiplier += 0.25
-		_apply_damage_buff()
+		_apply_damage_buff(1.25)
+	elif ability_id == "limit_break":
+		_activate_limit_break()
+	elif ability_id == "evolution":
+		_activate_evolution()
 	else:
 		_give_weapon(ability_id)
 	_owned_abilities.append(ability_id)
@@ -97,10 +101,30 @@ func _give_weapon(weapon_id: String) -> void:
 	player.add_child(weapon_node)
 	_weapons_by_id[weapon_id] = weapon_node
 
-func _apply_damage_buff() -> void:
+func _apply_damage_buff(multiplier: float) -> void:
 	for w in _weapons_by_id.values():
 		if "damage" in w:
-			w.damage *= 1.25
+			w.damage *= multiplier
+
+## Limit Break: double all weapon damage, halve all cooldowns, show screen flash.
+func _activate_limit_break() -> void:
+	player.damage_multiplier *= 2.0
+	_apply_damage_buff(2.0)
+	for w in _weapons_by_id.values():
+		if "cooldown" in w:
+			w.cooldown = max(0.1, w.cooldown * 0.5)
+	var flash: Node = load("res://scripts/screen_flash.gd").new()
+	get_tree().root.add_child(flash)
+
+## Evolution: triple damage, boost speed, full heal, play 2-second cutscene.
+func _activate_evolution() -> void:
+	player.damage_multiplier *= 3.0
+	player.speed_multiplier *= 1.5
+	player.max_health *= 1.5
+	player.heal(player.max_health)
+	_apply_damage_buff(3.0)
+	var cutscene: Node = load("res://scripts/evolution_cutscene.gd").new()
+	get_tree().root.add_child(cutscene)
 
 func increment_kill() -> void:
 	kill_count += 1

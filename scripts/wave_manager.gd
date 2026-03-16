@@ -87,7 +87,7 @@ func _on_enemy_died(pos: Vector2, exp_val: int) -> void:
 
 func _spawn_exp_orb(pos: Vector2, exp_val: int) -> void:
 	var orb: Node2D = EXP_SCENE.instantiate()
-	get_tree().current_scene.add_child(orb)
-	orb.global_position = pos + Vector2(randf_range(-10, 10), randf_range(-10, 10))
 	if "exp_value" in orb:
 		orb.exp_value = exp_val
+	orb.position = pos + Vector2(randf_range(-10, 10), randf_range(-10, 10))
+	get_tree().current_scene.call_deferred("add_child", orb)

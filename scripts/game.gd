@@ -10,11 +10,45 @@ var kill_count := 0
 var _owned_abilities: Array[String] = []
 var _weapons_by_id: Dictionary = {}
 
+# Active One Piece path (base-weapon ID) and the weapon node for it
+var _op_path_id := ""
+
 const _WEAPON_SCRIPTS := {
 	"basic_shot": "res://scripts/weapons/basic_shot.gd",
 	"rasengan": "res://scripts/weapons/rasengan.gd",
 	"water_breathing": "res://scripts/weapons/water_breathing.gd",
 	"cursed_energy": "res://scripts/weapons/cursed_energy.gd",
+	# One Piece
+	"luffy_gum_gum": "res://scripts/weapons/gum_gum_pistol.gd",
+	"zoro_three_sword": "res://scripts/weapons/three_sword_style.gd",
+	"sanji_black_leg": "res://scripts/weapons/black_leg.gd",
+	"nami_weather": "res://scripts/weapons/weather_staff.gd",
+	"robin_devil_fruit": "res://scripts/weapons/devil_fruit_bloom.gd",
+}
+
+# Upgrade-level chain for each One Piece path (indices 0-4 → levels 2-6)
+const _OP_UPGRADES := {
+	"luffy_gum_gum":    ["luffy_up_1", "luffy_up_2", "luffy_up_3", "luffy_up_4", "luffy_up_5"],
+	"zoro_three_sword": ["zoro_up_1",  "zoro_up_2",  "zoro_up_3",  "zoro_up_4",  "zoro_up_5"],
+	"sanji_black_leg":  ["sanji_up_1", "sanji_up_2", "sanji_up_3", "sanji_up_4", "sanji_up_5"],
+	"nami_weather":     ["nami_up_1",  "nami_up_2",  "nami_up_3",  "nami_up_4",  "nami_up_5"],
+	"robin_devil_fruit":["robin_up_1", "robin_up_2", "robin_up_3", "robin_up_4", "robin_up_5"],
+}
+
+const _OP_LIMIT_BREAKS := {
+	"luffy_gum_gum":    "luffy_lb",
+	"zoro_three_sword": "zoro_lb",
+	"sanji_black_leg":  "sanji_lb",
+	"nami_weather":     "nami_lb",
+	"robin_devil_fruit":"robin_lb",
+}
+
+const _OP_EVOLUTIONS := {
+	"luffy_gum_gum":    "luffy_evo",
+	"zoro_three_sword": "zoro_evo",
+	"sanji_black_leg":  "sanji_evo",
+	"nami_weather":     "nami_evo",
+	"robin_devil_fruit":"robin_evo",
 }
 
 func _ready() -> void:
@@ -83,9 +117,38 @@ func _on_ability_chosen(ability_id: String) -> void:
 	elif ability_id == "damage_up":
 		player.damage_multiplier += 0.25
 		_apply_damage_buff()
-	else:
+	elif _WEAPON_SCRIPTS.has(ability_id):
 		_give_weapon(ability_id)
+		# Track the active One Piece path if this is an OP base weapon
+		if _OP_UPGRADES.has(ability_id):
+			_op_path_id = ability_id
+	else:
+		_handle_op_progression(ability_id)
 	_owned_abilities.append(ability_id)
+
+## Apply an OP upgrade, limit break, or evolution to the active path weapon.
+func _handle_op_progression(ability_id: String) -> void:
+	if _op_path_id.is_empty():
+		return
+	var weapon_node = _weapons_by_id.get(_op_path_id)
+	if not is_instance_valid(weapon_node):
+		return
+	# Check for upgrade
+	var upgrades: Array = _OP_UPGRADES.get(_op_path_id, [])
+	var up_idx := upgrades.find(ability_id)
+	if up_idx >= 0:
+		if weapon_node.has_method("upgrade"):
+			weapon_node.upgrade(up_idx + 1)  # levels 1-5
+		return
+	# Check for limit break
+	if _OP_LIMIT_BREAKS.get(_op_path_id, "") == ability_id:
+		if weapon_node.has_method("activate_limit_break"):
+			weapon_node.activate_limit_break()
+		return
+	# Check for evolution
+	if _OP_EVOLUTIONS.get(_op_path_id, "") == ability_id:
+		if weapon_node.has_method("activate_evolution"):
+			weapon_node.activate_evolution()
 
 func _give_weapon(weapon_id: String) -> void:
 	if _weapons_by_id.has(weapon_id):

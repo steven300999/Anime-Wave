@@ -7,6 +7,7 @@ signal enemy_spawned
 
 const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 const EXP_SCENE := preload("res://scenes/exp_orb.tscn")
+const ARCHETYPES := ["striker", "spinner", "sniper"]
 
 @export var spawn_radius_min := 500.0
 @export var spawn_radius_max := 700.0
@@ -24,12 +25,16 @@ var _active := false
 var _health_multiplier := 1.0
 var _speed_bonus := 0.0
 
-func _ready() -> void:
-	pass
-
 func start() -> void:
 	_active = true
+	spawn_radius_min = GameBalance.SINGLE["wave_spawn_min"]
+	spawn_radius_max = GameBalance.SINGLE["wave_spawn_max"]
 	_start_wave()
+
+func stop() -> void:
+	_active = false
+	enemies_to_spawn = 0
+	_between_waves = false
 
 func _process(delta: float) -> void:
 	if not _active:
@@ -49,13 +54,15 @@ func _process(delta: float) -> void:
 
 func _start_wave() -> void:
 	wave_number += 1
-	# Scale difficulty each wave
-	var base_count := 5 + (wave_number - 1) * 3
+	var base_count := GameBalance.SINGLE["base_enemies"] + (wave_number - 1) * GameBalance.SINGLE["per_wave_add"]
 	enemies_to_spawn = base_count
 	enemies_alive = 0
-	_health_multiplier = 1.0 + (wave_number - 1) * 0.25
-	_speed_bonus = max(0.0, (wave_number - 3) * 8.0)
-	_spawn_interval = max(0.15, 0.5 - wave_number * 0.03)
+	_health_multiplier = 1.0 + (wave_number - 1) * GameBalance.SINGLE["health_growth"]
+	_speed_bonus = max(0.0, (wave_number - GameBalance.SINGLE["speed_growth_after_wave"]) * GameBalance.SINGLE["speed_growth"])
+	_spawn_interval = max(
+		GameBalance.SINGLE["spawn_interval_floor"],
+		GameBalance.SINGLE["spawn_interval_start"] - wave_number * GameBalance.SINGLE["spawn_interval_delta"]
+	)
 	_spawn_timer = 0.0
 	wave_started.emit(wave_number)
 
@@ -63,15 +70,16 @@ func _spawn_enemy() -> void:
 	var player := get_tree().get_first_node_in_group("player") as Node2D
 	if player == null:
 		return
-	# Spawn at a random point around the player just outside the viewport
 	var angle := randf() * TAU
 	var dist := randf_range(spawn_radius_min, spawn_radius_max)
 	var spawn_pos := player.global_position + Vector2(cos(angle), sin(angle)) * dist
 	var enemy: Node2D = ENEMY_SCENE.instantiate()
 	get_tree().current_scene.add_child(enemy)
 	enemy.global_position = spawn_pos
+	var archetype := ARCHETYPES[randi() % ARCHETYPES.size()]
+	var is_elite := wave_number % GameBalance.SINGLE["elite_every"] == 0 and randi() % 3 == 0
 	if enemy.has_method("setup"):
-		enemy.setup(_health_multiplier, _speed_bonus)
+		enemy.setup(_health_multiplier, _speed_bonus, archetype, is_elite)
 	enemy.connect("died", _on_enemy_died)
 	enemies_alive += 1
 	enemy_spawned.emit()

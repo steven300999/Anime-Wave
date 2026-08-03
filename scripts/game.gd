@@ -6,201 +6,150 @@ extends Node2D
 @onready var level_up_ui = $LevelUpUI
 @onready var camera: Camera2D = $Camera2D
 
-var kill_count := 0
+const RIVAL_SCENE := preload("res://scenes/rival.tscn")
+const ZONE_SCENE := preload("res://scenes/shrinking_zone.tscn")
 
-## Current level of each weapon path (0 = not yet owned, 1–7 = unlocked tiers).
-var _path_levels: Dictionary = {"rasengan": 0, "water_breathing": 0, "cursed_energy": 0}
-## The weapon path whose Evolution is currently active ("" = none).
-var _evolution_active := ""
-## Maps path_id -> current level (0 / absent = unowned, 1-5 = upgrades,
-## 6 = Limit Break, 7 = Evolution).
-var path_levels: Dictionary = {}
-## True once the player has unlocked any Evolution (level 7) upgrade.
-var has_evolution: bool = false
-
-var _weapons_by_id: Dictionary = {}
-
-const _WEAPON_SCRIPTS := {
+const WEAPON_SCRIPTS := {
 	"basic_shot": "res://scripts/weapons/basic_shot.gd",
 	"rasengan": "res://scripts/weapons/rasengan.gd",
 	"water_breathing": "res://scripts/weapons/water_breathing.gd",
 	"cursed_energy": "res://scripts/weapons/cursed_energy.gd",
 }
 
-## Maps path_id to the weapon it controls.
-const _PATH_WEAPON := {
-	"naruto": "rasengan",
-	"tanjiro": "water_breathing",
-	"itadori": "cursed_energy",
-}
-
-## Standard per-level damage multiplier applied at most path upgrade tiers.
-const _DAMAGE_BOOST := 1.3
+var kill_count := 0
+var path_levels: Dictionary = {}
+var has_evolution := false
+var _weapons_by_id: Dictionary = {}
+var _zone: Node2D = null
+var _match_finished := false
 
 func _ready() -> void:
-	# Connect player signals
 	player.health_changed.connect(hud.update_health)
 	player.exp_changed.connect(hud.update_exp)
 	player.leveled_up.connect(_on_player_leveled_up)
 	player.died.connect(_on_player_died)
 
-	# Initialize HUD
-	hud.update_health(player.current_health, player.max_health)
-	hud.update_exp(0, player.exp_required)
-	hud.update_level(1)
-
-	# Connect wave manager signals
 	wave_manager.wave_started.connect(_on_wave_started)
 	wave_manager.all_enemies_killed.connect(_on_all_enemies_killed)
 	wave_manager.enemy_killed.connect(increment_kill)
 
-	# Connect level-up UI
 	level_up_ui.ability_chosen.connect(_on_ability_chosen)
 
-	# Register camera for background script
 	camera.add_to_group("main_camera")
+	hud.update_health(player.current_health, player.max_health)
+	hud.update_exp(0, player.exp_required)
+	hud.update_level(1)
 
-	# Give player starting weapon
+	for style_id in StyleData.STYLE_ORDER:
+		path_levels[style_id] = 0
+
 	_give_weapon("basic_shot")
-
-	# Start waves
-	wave_manager.start()
-
-	# Start background scroll
+	_configure_mode()
 	_setup_background()
 
 func _process(_delta: float) -> void:
-	# Camera follows player
 	if is_instance_valid(player):
 		camera.global_position = player.global_position
+	if _is_multiplayer_mode() and not _match_finished:
+		_update_remaining_players()
+
+func _configure_mode() -> void:
+	if _is_multiplayer_mode():
+		hud.set_mode(GameBalance.UI["multiplayer_mode_label"], true)
+		wave_manager.stop()
+		player.add_to_group("combatants")
+		_spawn_rivals(GameBalance.MULTI["rival_count"])
+		_setup_shrinking_zone()
+	else:
+		hud.set_mode(GameBalance.UI["single_mode_label"], false)
+		wave_manager.start()
+
+func _is_multiplayer_mode() -> bool:
+	var settings := get_node_or_null("/root/SessionSettings")
+	return settings != null and settings.is_multiplayer_mode()
 
 func _setup_background() -> void:
-	pass  # Background script on BackgroundTiles handles itself
+	pass
 
 func _on_player_leveled_up(level: int) -> void:
 	hud.update_level(level)
-	var has_any_limit_break := false
-	for l: int in _path_levels.values():
-		if l >= 6:
-			has_any_limit_break = true
-			break
-	level_up_ui.show_choices(level, _path_levels, has_any_limit_break, not _evolution_active.is_empty())
 	level_up_ui.show_choices(level, path_levels, has_evolution)
 
 func _on_player_died() -> void:
-	# Wait briefly then show game over (player is hidden but not freed)
+	if _is_multiplayer_mode():
+		_end_multiplayer_match(false)
+		return
 	await get_tree().create_timer(0.8).timeout
-	var game_over: Node = load("res://scenes/game_over.tscn").instantiate()
-	game_over.setup(kill_count, hud.get_elapsed(), player.level)
-	get_tree().root.add_child(game_over)
-	queue_free()
+	_show_game_over(false)
 
 func _on_wave_started(wave: int) -> void:
-	hud.update_wave(wave)
+	if not _is_multiplayer_mode():
+		hud.update_wave(wave)
 
 func _on_all_enemies_killed() -> void:
-	pass  # Next wave starts automatically after cooldown
+	pass
 
 func _on_ability_chosen(ability_id: String) -> void:
+	if StyleData.is_style(ability_id):
+		var current_level: int = path_levels.get(ability_id, 0)
+		var new_level := min(7, current_level + 1)
+		path_levels[ability_id] = new_level
+		_apply_style_upgrade(ability_id, new_level)
+		if new_level == 7:
+			has_evolution = true
+		return
+
 	match ability_id:
 		"heal":
 			player.heal(30.0)
 		"speed_up":
 			player.speed_multiplier += 0.2
 		"damage_up":
-			player.damage_multiplier += 0.25
 			_apply_damage_buff()
-		_:
-			# Weapon path — increment tier and apply upgrades
-			var current_level: int = _path_levels.get(ability_id, 0)
-			var new_level := current_level + 1
-			_path_levels[ability_id] = new_level
-			if current_level == 0:
-				_give_weapon(ability_id)  # First pick: spawn the weapon node
-			else:
-				_upgrade_weapon(ability_id, new_level)
-			if new_level == 7:
-				_evolution_active = ability_id
-func _on_ability_chosen(path_id: String) -> void:
-	var current_level: int = path_levels.get(path_id, 0)
-	var new_level: int = current_level + 1
-	path_levels[path_id] = new_level
-	if new_level == 7:
-		has_evolution = true
-	_apply_path_upgrade(path_id, new_level)
 
-## Apply gameplay stat changes for a path reaching the given level.
-func _apply_path_upgrade(path_id: String, level: int) -> void:
-	var weapon_id: String = _PATH_WEAPON.get(path_id, "")
+func _apply_style_upgrade(style_id: String, level: int) -> void:
+	var weapon_id := StyleData.weapon_id_for_style(style_id)
 	if weapon_id.is_empty():
 		return
-
-	# Level 1: spawn the weapon for the first time
 	if level == 1:
 		_give_weapon(weapon_id)
 		return
+	_upgrade_weapon(weapon_id, level)
 
-	var weapon_node = _weapons_by_id.get(weapon_id, null)
-	if not is_instance_valid(weapon_node):
+	var weapon = _weapons_by_id.get(weapon_id, null)
+	if not is_instance_valid(weapon):
 		return
 
-	match path_id:
-		"naruto":
-			match level:
-				2, 4, 5:
-					weapon_node.damage *= _DAMAGE_BOOST
-				3:  # Twin Rasengan — bigger jump
-					weapon_node.damage *= 1.5
-				6:  # Limit Break: Ultra Rasengan
-					weapon_node.damage *= 3.0
-				7:  # Evolution: Nine-Tails Mode
-					weapon_node.damage *= 2.0
-					player.speed_multiplier += 1.0
-		"tanjiro":
-			match level:
-				2:
-					weapon_node.damage *= _DAMAGE_BOOST
-				3:  # Flowing Dance — faster slashes
-					weapon_node.damage *= _DAMAGE_BOOST
-					weapon_node.cooldown = max(weapon_node.cooldown * 0.65, 0.4)
-				4, 5:
-					weapon_node.damage *= _DAMAGE_BOOST
-				6:  # Limit Break: Hinokami Kagura
-					weapon_node.damage *= 3.0
-				7:  # Evolution: Demon Slayer Mark
-					weapon_node.damage *= 2.0
-					weapon_node.cooldown = max(weapon_node.cooldown * 0.5, 0.3)
-		"itadori":
-			match level:
-				2, 3, 4:
-					weapon_node.damage *= _DAMAGE_BOOST
-				5:  # 1000 Strikes — faster fire rate
-					weapon_node.damage *= _DAMAGE_BOOST
-					weapon_node.cooldown = max(weapon_node.cooldown * 0.6, 0.4)
-				6:  # Limit Break: Black Flash
-					weapon_node.damage *= 3.0
-				7:  # Evolution: Sukuna's Domain
-					weapon_node.damage *= 2.0
-					weapon_node.cooldown = max(weapon_node.cooldown * 0.5, 0.3)
+	if level == 7:
+		match style_id:
+			"maruto":
+				player.speed_multiplier += 0.8
+			"panjiro":
+				if "cooldown" in weapon:
+					weapon.cooldown = max(0.35, weapon.cooldown * 0.8)
+			"itabro":
+				if "projectile_speed" in weapon:
+					weapon.projectile_speed += 80.0
 
 func _give_weapon(weapon_id: String) -> void:
 	if _weapons_by_id.has(weapon_id):
-		return  # Already equipped
-	if not _WEAPON_SCRIPTS.has(weapon_id):
+		return
+	if not WEAPON_SCRIPTS.has(weapon_id):
 		return
 	var weapon_node := Node2D.new()
-	weapon_node.set_script(load(_WEAPON_SCRIPTS[weapon_id]))
+	weapon_node.set_script(load(WEAPON_SCRIPTS[weapon_id]))
 	player.add_child(weapon_node)
 	_weapons_by_id[weapon_id] = weapon_node
 
-## Call the weapon's upgrade() method for the new path level.
 func _upgrade_weapon(weapon_id: String, level: int) -> void:
-	if _weapons_by_id.has(weapon_id):
-		var weapon: Node = _weapons_by_id[weapon_id]
-		if weapon.has_method("upgrade"):
-			weapon.upgrade(level)
+	if not _weapons_by_id.has(weapon_id):
+		return
+	var weapon: Node = _weapons_by_id[weapon_id]
+	if weapon.has_method("upgrade"):
+		weapon.upgrade(level)
 
 func _apply_damage_buff() -> void:
+	player.damage_multiplier += 0.25
 	for w in _weapons_by_id.values():
 		if "damage" in w:
 			w.damage *= 1.25
@@ -208,3 +157,50 @@ func _apply_damage_buff() -> void:
 func increment_kill() -> void:
 	kill_count += 1
 	hud.update_kills(kill_count)
+
+func _spawn_rivals(count: int) -> void:
+	var radius := GameBalance.MULTI["arena_start_radius"] * 0.75
+	for i in count:
+		var rival: Node2D = RIVAL_SCENE.instantiate()
+		var angle := float(i) / float(max(1, count)) * TAU
+		rival.global_position = Vector2(cos(angle), sin(angle)) * radius
+		rival.eliminated.connect(_on_rival_eliminated)
+		add_child(rival)
+	_update_remaining_players()
+
+func _on_rival_eliminated(_rival: Node) -> void:
+	increment_kill()
+	_update_remaining_players()
+
+func _update_remaining_players() -> void:
+	var alive := 0
+	for node in get_tree().get_nodes_in_group("combatants"):
+		if is_instance_valid(node):
+			alive += 1
+	hud.update_remaining_players(alive)
+	if alive <= 1:
+		_end_multiplayer_match(is_instance_valid(player) and player.visible)
+
+func _setup_shrinking_zone() -> void:
+	_zone = ZONE_SCENE.instantiate()
+	add_child(_zone)
+	_zone.center = Vector2.ZERO
+	_zone.configure(GameBalance.MULTI)
+	_zone.zone_updated.connect(_on_zone_updated)
+
+func _on_zone_updated(radius: float, progress: float) -> void:
+	hud.update_zone_status(radius, progress)
+
+func _end_multiplayer_match(player_won: bool) -> void:
+	if _match_finished:
+		return
+	_match_finished = true
+	await get_tree().create_timer(0.8).timeout
+	_show_game_over(player_won)
+
+func _show_game_over(player_won: bool) -> void:
+	var game_over: Node = load("res://scenes/game_over.tscn").instantiate()
+	var mode_name := "Multiplayer LMS" if _is_multiplayer_mode() else "Single PvE"
+	game_over.setup(kill_count, hud.get_elapsed(), player.level, player_won, mode_name)
+	get_tree().root.add_child(game_over)
+	queue_free()
